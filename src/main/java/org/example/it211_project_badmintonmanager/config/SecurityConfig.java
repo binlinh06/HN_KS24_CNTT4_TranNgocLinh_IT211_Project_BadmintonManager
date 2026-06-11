@@ -40,7 +40,7 @@
 
                             // 2. Phân quyền chặt chẽ cho từng Role
                             .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMIN")
-                            .requestMatchers("/api/v1/manager/**").hasAuthority("ROLE_MANAGER")     // API dành riêng cho Chủ sân
+                            .requestMatchers("/api/v1/manager/**").hasAnyAuthority("ROLE_MANAGER", "ROLE_ADMIN")     // API dành riêng cho Chủ sân
                             .requestMatchers("/api/v1/customer/**").hasAuthority("ROLE_CUSTOMER")   // API dành riêng cho Khách hàng
 
                             // 3. Tất cả các request không lọt vào các điều kiện trên đều bắt buộc phải có Token

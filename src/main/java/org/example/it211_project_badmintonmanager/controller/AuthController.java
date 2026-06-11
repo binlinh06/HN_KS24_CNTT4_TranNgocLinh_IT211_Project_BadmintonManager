@@ -1,14 +1,9 @@
 package org.example.it211_project_badmintonmanager.controller;
 
 import jakarta.validation.Valid;
-import org.example.it211_project_badmintonmanager.dto.AuthRequestDTO;
-import org.example.it211_project_badmintonmanager.dto.AuthResponseDTO;
-import org.example.it211_project_badmintonmanager.dto.ResponseDTO;
-import org.example.it211_project_badmintonmanager.dto.UserDTO;
-import org.example.it211_project_badmintonmanager.dto.UserRegistrationDTO;
+import org.example.it211_project_badmintonmanager.dto.*;
 import org.example.it211_project_badmintonmanager.security.JwtUtil;
 import org.example.it211_project_badmintonmanager.service.UserService;
-import org.example.it211_project_badmintonmanager.dto.TokenRefreshRequestDTO;
 import org.example.it211_project_badmintonmanager.entity.RefreshToken;
 import org.example.it211_project_badmintonmanager.entity.User;
 import org.example.it211_project_badmintonmanager.repository.UserRepository;
@@ -164,5 +159,25 @@ public class AuthController {
         return ResponseEntity.ok(
                 ResponseDTO.<Void>builder().success(true).message("Đăng xuất thành công").build()
         );
+    }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ResponseDTO<String>> forgotPassword(@RequestBody ForgotPasswordDTO request) {
+        try {
+            // Lấy mật khẩu mới ngẫu nhiên từ Service
+            String newPassword = userService.resetPassword(request.getEmail());
+
+            return ResponseEntity.ok(
+                    ResponseDTO.<String>builder()
+                            .success(true)
+                            // Trả về thẳng Postman để bạn dễ test. Sau này tích hợp gửi mail thì bỏ data đi nhé!
+                            .message("Đã reset mật khẩu thành công!")
+                            .data("Mật khẩu mới của bạn là: " + newPassword)
+                            .build()
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    ResponseDTO.<String>builder().success(false).message(e.getMessage()).build()
+            );
+        }
     }
 }

@@ -1,5 +1,6 @@
 package org.example.it211_project_badmintonmanager.service;
 
+import org.example.it211_project_badmintonmanager.dto.ChangePasswordDTO;
 import org.example.it211_project_badmintonmanager.dto.UserDTO;
 import org.example.it211_project_badmintonmanager.dto.UserRegistrationDTO;
 import org.example.it211_project_badmintonmanager.entity.Role;
@@ -127,5 +128,43 @@ public class UserService {
                 .role(user.getRole().name())
                 .isEnabled(user.getIsEnabled())
                 .build();
+    }
+    // 1. Chức năng Đổi mật khẩu (Authenticated)
+    @Transactional
+    public void changePassword(String username, ChangePasswordDTO dto) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+        // Kiểm tra mật khẩu cũ xem có khớp với DB không
+        if (!passwordEncoder.matches(dto.getOldPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Mật khẩu cũ không chính xác!");
+        }
+
+        // Kiểm tra mật khẩu mới và xác nhận có giống nhau không
+        if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
+            throw new IllegalArgumentException("Mật khẩu xác nhận không khớp!");
+        }
+
+        // Mã hóa mật khẩu mới và lưu
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    // 2. Chức năng Quên mật khẩu (Public)
+    @Transactional
+    public String resetPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email này chưa được đăng ký trong hệ thống!"));
+
+        // Tạo ra một mật khẩu ngẫu nhiên (Ví dụ: Auto8372@)
+        String newRandomPassword = "Auto" + (int)(Math.random() * 10000) + "@";
+
+        // Mã hóa và lưu vào DB
+        user.setPassword(passwordEncoder.encode(newRandomPassword));
+        userRepository.save(user);
+
+        // THỰC TẾ: Ở đây sẽ gọi hàm gửi Email chứa newRandomPassword cho khách hàng.
+        // ĐỂ TEST: Tạm thời chúng ta sẽ trả thẳng chuỗi này về Controller để bạn test trên Postman.
+        return newRandomPassword;
     }
 }

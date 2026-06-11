@@ -82,4 +82,25 @@ public class BookingService {
                 .status(booking.getStatus() != null ? booking.getStatus().name() : "PENDING")
                 .build();
     }
+    // FR-08: Phê duyệt hoặc Từ chối lịch đặt sân
+    @Transactional
+    public BookingResponseDTO updateBookingStatus(Long id, String newStatus) {
+        // 1. Tìm đơn đặt sân
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đặt sân với ID: " + id));
+
+        // 2. Ép kiểu String từ DTO sang Enum BookingStatus
+        try {
+            // .toUpperCase() giúp tránh lỗi nếu Postman gửi lên chữ thường (vd: "confirmed")
+            booking.setStatus(BookingStatus.valueOf(newStatus.toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Trạng thái không hợp lệ! Chỉ chấp nhận CONFIRMED, REJECTED, PENDING...");
+        }
+
+        // 3. Lưu xuống Database
+        Booking updatedBooking = bookingRepository.save(booking);
+
+        // 4. Trả về thông tin đơn đã cập nhật (tận dụng lại hàm mapToBookingResponseDTO đã viết)
+        return mapToBookingResponseDTO(updatedBooking);
+    }
 }
