@@ -1,40 +1,37 @@
 package org.example.it211_project_badmintonmanager.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.UUID;
+import java.util.Map;
 
 @Service
 public class FileStorageService {
 
-    // Thư mục chứa ảnh sẽ tự động được tạo ra ở thư mục gốc của project
-    private final Path fileStorageLocation = Paths.get("uploads").toAbsolutePath().normalize();
-
-    public FileStorageService() {
-        try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (Exception ex) {
-            throw new RuntimeException("Không thể tạo thư mục lưu trữ file.", ex);
-        }
-    }
+    @Autowired
+    private Cloudinary cloudinary;
 
     public String storeFile(MultipartFile file) {
         try {
-            // Tạo tên file ngẫu nhiên để không bị trùng (vd: 123e4567-e89b..._anhsan1.jpg)
-            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+            // Validate định dạng và dung lượng (Có thể làm chi tiết hơn nếu muốn)
+            if (file.isEmpty()) {
+                throw new RuntimeException("Tệp tin không được để trống!");
+            }
 
-            // Copy file vào thư mục uploads
-            Path targetLocation = this.fileStorageLocation.resolve(fileName);
-            Files.copy(file.getInputStream(), targetLocation);
+            // Gọi Cloudinary SDK để truyền File Stream lên Cloud
+            // ObjectUtils.emptyMap() báo cho Cloudinary biết ta dùng các cấu hình mặc định
+            Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.emptyMap());
 
-            return fileName;
+            // Sau khi upload thành công, Cloudinary trả về một map chứa nhiều thông tin.
+            // Ta chỉ cần lấy cái link ảnh an toàn (secure_url)
+            return uploadResult.get("secure_url").toString();
+
         } catch (IOException ex) {
-            throw new RuntimeException("Không thể lưu file " + file.getOriginalFilename() + ". Vui lòng thử lại!", ex);
+            throw new RuntimeException("Lỗi khi kết nối với máy chủ Cloudinary. Vui lòng thử lại!", ex);
         }
     }
 }

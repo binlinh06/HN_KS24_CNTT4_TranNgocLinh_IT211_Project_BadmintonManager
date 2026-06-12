@@ -28,7 +28,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     implementation 'org.springframework.boot:spring-boot-starter-aop'
-
+// Thư viện Cloudinary SDK để upload ảnh lên Cloud
+    implementation 'com.cloudinary:cloudinary-http44:1.36.0'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     compileOnly 'org.projectlombok:lombok'
