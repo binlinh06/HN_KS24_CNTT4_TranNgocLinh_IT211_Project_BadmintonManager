@@ -1,6 +1,9 @@
 package org.example.it211_project_badmintonmanager.aop;
 
+import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
@@ -36,5 +39,30 @@ public class LoggingAspect {
 
         // Trả kết quả về cho Postman như bình thường
         return proceed;
+    }
+    /**
+     * @AfterReturning: Bắt sự kiện đặt sân (hoặc cập nhật sân) THÀNH CÔNG
+     * Nhắm mục tiêu vào tất cả các hàm trong BookingService
+     */
+    @AfterReturning(
+            pointcut = "execution(* org.example.it211_project_badmintonmanager.service.BookingService.*(..))",
+            returning = "result"
+    )
+    public void logAfterReturningBooking(JoinPoint joinPoint, Object result) {
+        log.info("✅ [AUDIT LOG - BOOKING] Thực thi thành công hàm nghiệp vụ: {}. Kết quả trả về: {}",
+                joinPoint.getSignature().getName(), result);
+    }
+
+    /**
+     * @AfterThrowing: Bắt sự kiện đặt sân THẤT BẠI (văng Exception)
+     * Nhắm mục tiêu vào tất cả các hàm trong BookingService
+     */
+    @AfterThrowing(
+            pointcut = "execution(* org.example.it211_project_badmintonmanager.service.BookingService.*(..))",
+            throwing = "error"
+    )
+    public void logAfterThrowingBooking(JoinPoint joinPoint, Throwable error) {
+        log.error("❌ [AUDIT LOG - BOOKING LỖI] Sự cố xảy ra tại hàm nghiệp vụ: {}. Nguyên nhân: {}",
+                joinPoint.getSignature().getName(), error.getMessage());
     }
 }

@@ -1,8 +1,10 @@
 package org.example.it211_project_badmintonmanager.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.example.it211_project_badmintonmanager.dto.*;
 import org.example.it211_project_badmintonmanager.security.JwtUtil;
+import org.example.it211_project_badmintonmanager.service.TokenBlacklistService;
 import org.example.it211_project_badmintonmanager.service.UserService;
 import org.example.it211_project_badmintonmanager.entity.RefreshToken;
 import org.example.it211_project_badmintonmanager.entity.User;
@@ -10,8 +12,9 @@ import org.example.it211_project_badmintonmanager.repository.UserRepository;
 import org.example.it211_project_badmintonmanager.service.RefreshTokenService;
 // Import thêm class CustomUserDetailsService (Đảm bảo đúng đường dẫn package security của bạn)
 import org.example.it211_project_badmintonmanager.security.CustomUserDetailsService;
-
+import java.util.Date;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,9 +30,9 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/public/auth")
 public class AuthController {
-
+    // ✅ THÊM DÒNG NÀY VÀO THAY THẾ
     @Autowired
-    private AuthenticationManager authenticationManager;
+    private org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration authenticationConfiguration;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -47,11 +50,15 @@ public class AuthController {
     @Autowired
     private CustomUserDetailsService userDetailsService;
 
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+
     // 1. ĐĂNG NHẬP
     // Thay đổi <?> thành <AuthResponseDTO>
     @PostMapping("/login")
     public ResponseEntity<ResponseDTO<AuthResponseDTO>> login(@RequestBody AuthRequestDTO request) {
         try {
+            org.springframework.security.authentication.AuthenticationManager authenticationManager = authenticationConfiguration.getAuthenticationManager();
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
             );
@@ -77,6 +84,8 @@ public class AuthController {
                     // Thêm <AuthResponseDTO> vào trước builder()
                     ResponseDTO.<AuthResponseDTO>builder().success(false).message("Sai tài khoản hoặc mật khẩu").build()
             );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -111,53 +120,36 @@ public class AuthController {
         }
     }
 
-    // 3. REFRESH TOKEN (FR-02)
-    @PostMapping("/refresh-token")
-    public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(@Valid @RequestBody TokenRefreshRequestDTO requestDTO) {
-        String requestRefreshToken = requestDTO.getRefreshToken();
-
-        try {
-            return refreshTokenService.findByToken(requestRefreshToken)
-                    .map(refreshTokenService::verifyExpiration)
-                    .map(RefreshToken::getUser)
-                    .map(user -> {
-                        String token = jwtUtil.generateToken(userDetailsService.loadUserByUsername(user.getUsername()));
-                        AuthResponseDTO responseDTO = AuthResponseDTO.builder()
-                                .accessToken(token)
-                                .refreshToken(requestRefreshToken)
-                                .build();
-
-                        return ResponseEntity.ok(
-                                // Thêm <AuthResponseDTO> vào trước builder()
-                                ResponseDTO.<AuthResponseDTO>builder().success(true).message("Cấp lại Token thành công").data(responseDTO).build()
-                        );
-                    })
-                    .orElseThrow(() -> new RuntimeException("Refresh Token không tồn tại trong hệ thống!"));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                    // Thêm <AuthResponseDTO> vào trước builder()
-                    ResponseDTO.<AuthResponseDTO>builder().success(false).message(e.getMessage()).build()
-            );
-        }
-    }
-
-    // 4. ĐĂNG XUẤT (FR-03 - Revoke Token)
+    // 3. ĐĂNG XUẤT (FR-03 - Revoke Token)
     @PostMapping("/logout")
-    public ResponseEntity<ResponseDTO<Void>> logout() {
-        // Lấy thông tin người dùng đang gọi request từ Security Context
+    public ResponseEntity<ResponseDTO<Void>> logout(HttpServletRequest request) { // 👉 THÊM HttpServletRequest VÀO ĐÂY
+
+        // 1. Xóa Refresh Token trong Database (Luồng cũ của bạn)
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !auth.getPrincipal().equals("anonymousUser")) {
             String username = auth.getName();
             User user = userRepository.findByUsername(username).orElse(null);
-
             if (user != null) {
-                // Xóa Refresh Token trong Database -> Thu hồi quyền làm mới Token
                 refreshTokenService.deleteByUserId(user.getId());
             }
         }
 
+        // 2. Thu hồi Access Token (Lưu vào sổ đen TokenBlacklist) theo yêu cầu UC-03
+        String authorizationHeader = request.getHeader("Authorization");
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            String jwt = authorizationHeader.substring(7);
+            try {
+                // Rút xuất ngày hết hạn của token từ JwtUtil
+                Date expirationDate = jwtUtil.extractExpiration(jwt);
+                // Tống nó vào danh sách đen
+                tokenBlacklistService.addToBlacklist(jwt, expirationDate);
+            } catch (Exception e) {
+                // Token có thể đã hết hạn sẵn, bỏ qua
+            }
+        }
+
         return ResponseEntity.ok(
-                ResponseDTO.<Void>builder().success(true).message("Đăng xuất thành công").build()
+                ResponseDTO.<Void>builder().success(true).message("Đăng xuất và thu hồi Token thành công").build()
         );
     }
     @PostMapping("/forgot-password")
