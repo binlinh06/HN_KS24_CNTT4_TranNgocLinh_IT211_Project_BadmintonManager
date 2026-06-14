@@ -3,6 +3,7 @@ package org.example.it211_project_badmintonmanager.controller;
 import org.example.it211_project_badmintonmanager.dto.BookingRequestDTO;
 import org.example.it211_project_badmintonmanager.dto.BookingResponseDTO;
 import org.example.it211_project_badmintonmanager.dto.ResponseDTO;
+import org.example.it211_project_badmintonmanager.exception.DataConflictException;
 import org.example.it211_project_badmintonmanager.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,25 +22,30 @@ public class BookingController {
     private BookingService bookingService;
 
     // UC-06: Khách hàng tạo lịch đặt sân
+    // 👉 1. Đổi <Void> thành <BookingResponseDTO>
     @PostMapping
-    public ResponseEntity<ResponseDTO<Void>> createBooking(@RequestBody BookingRequestDTO requestDTO) {
+    public ResponseEntity<ResponseDTO<BookingResponseDTO>> createBooking(@RequestBody BookingRequestDTO requestDTO) {
         try {
-            // Lấy trực tiếp username từ Token xác thực của Spring Security
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             String currentUsername = auth.getName();
 
-            bookingService.createBooking(requestDTO, currentUsername);
+            // 👉 2. Hứng dữ liệu trả về từ Service
+            BookingResponseDTO newBooking = bookingService.createBooking(requestDTO, currentUsername);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
-                    ResponseDTO.<Void>builder().success(true).message("Lịch đặt sân đã được tạo và đang chờ xác nhận").build()
+                    ResponseDTO.<BookingResponseDTO>builder()
+                            .success(true)
+                            .message("Lịch đặt sân đã được tạo và đang chờ xác nhận")
+                            .data(newBooking) // 👉 3. NHÉT DATA VÀO ĐÂY
+                            .build()
             );
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body( // Trùng lịch -> HTTP 409
-                    ResponseDTO.<Void>builder().success(false).message(e.getMessage()).build()
+        } catch (DataConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                    ResponseDTO.<BookingResponseDTO>builder().success(false).message(e.getMessage()).build()
             );
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body( // Lỗi logic -> HTTP 400
-                    ResponseDTO.<Void>builder().success(false).message(e.getMessage()).build()
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    ResponseDTO.<BookingResponseDTO>builder().success(false).message(e.getMessage()).build()
             );
         }
     }

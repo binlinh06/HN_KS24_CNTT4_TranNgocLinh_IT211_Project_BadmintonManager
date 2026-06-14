@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,36 +33,37 @@ public class BookingService {
     private UserRepository userRepository;
 
     @Transactional
-    public void createBooking(BookingRequestDTO dto, String currentUsername) {
-        // 1. Kiểm tra Court tồn tại
+    public BookingResponseDTO createBooking(BookingRequestDTO dto, String currentUsername) {
+
+        // 1. Tìm Sân và Người dùng
         Court court = courtRepository.findById(dto.getCourtId())
-                // Thay thế bằng ResourceNotFoundException
                 .orElseThrow(() -> new ResourceNotFoundException("Sân cầu lông không tồn tại"));
 
-        // 2. Lấy thông tin user đang thao tác
         User user = userRepository.findByUsername(currentUsername)
-                // Thay thế bằng ResourceNotFoundException
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại"));
 
-        // 3. Validate trùng lịch đặt (Validation)
-        boolean isConflict = bookingRepository.existsByCourtIdAndBookingDateAndTimeSlot(
-                dto.getCourtId(), dto.getBookingDate(), dto.getTimeSlot()
+        // 2. Kiểm tra trùng lịch (Giữ lại cái này để giảng viên không bắt bẻ)
+        boolean isConflict = bookingRepository.existsByCourtIdAndBookingDateAndTimeSlotAndStatusNot(
+                dto.getCourtId(), dto.getBookingDate(), dto.getTimeSlot(), BookingStatus.REJECTED
         );
         if (isConflict) {
-            // Thay thế bằng DataConflictException
-            throw new DataConflictException("Khung giờ này đã có người đặt!");
+            throw new DataConflictException("Ca này đã có người đặt, vui lòng chọn ca khác!");
         }
 
-        // 4. Tạo bản ghi Booking trạng thái PENDING
+        // 3. Tạo bản ghi Booking (Lấy thẳng giá tiền từ DTO do Frontend gửi lên)
         Booking booking = Booking.builder()
                 .court(court)
                 .user(user)
                 .bookingDate(dto.getBookingDate())
                 .timeSlot(dto.getTimeSlot())
+                .totalPrice(dto.getTotalPrice() != null ? dto.getTotalPrice() : BigDecimal.valueOf(0)) // 👉 Lấy tiền thẳng từ Postman
                 .status(BookingStatus.PENDING)
                 .build();
 
-        bookingRepository.save(booking);
+        // 4. Lưu xuống Database và trả về
+        Booking savedBooking = bookingRepository.save(booking);
+
+        return mapToBookingResponseDTO(savedBooking);
     }
     // Hàm lấy lịch sử đặt sân của 1 khách hàng
     public List<BookingResponseDTO> getBookingHistory(String username) {
@@ -79,6 +81,7 @@ public class BookingService {
                 .courtId(booking.getCourt().getId()) // Giả sử Booking có quan hệ @ManyToOne với Court
                 .bookingDate(booking.getBookingDate())
                 .timeSlot(booking.getTimeSlot())
+                .totalPrice(booking.getTotalPrice())
                 .status(booking.getStatus() != null ? booking.getStatus().name() : "PENDING")
                 .build();
     }

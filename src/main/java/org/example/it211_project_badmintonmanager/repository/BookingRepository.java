@@ -9,8 +9,15 @@ import java.util.List;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    // Kiểm tra trùng lịch đặt sân
-    boolean existsByCourtIdAndBookingDateAndTimeSlot(Long courtId, LocalDate bookingDate, String timeSlot);
+
+    // Đã đổi tên hàm: Thêm "AndStatusNot" để bỏ qua những đơn đã bị REJECTED (Từ chối)
+    boolean existsByCourtIdAndBookingDateAndTimeSlotAndStatusNot(
+            Long courtId,
+            LocalDate bookingDate,
+            String timeSlot,
+            org.example.it211_project_badmintonmanager.entity.BookingStatus status
+    );
+
     // Tìm lịch sử đặt sân theo Username và sắp xếp ngày giảm dần
     List<Booking> findByUser_UsernameOrderByBookingDateDesc(String username);
 }

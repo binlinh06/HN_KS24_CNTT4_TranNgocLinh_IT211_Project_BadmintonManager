@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -15,5 +16,7 @@ public class BookingResponseDTO {
     // Nếu bảng Booking của bạn có liên kết lấy được tên sân, bạn có thể thêm: private String courtName;
     private LocalDate bookingDate;
     private String timeSlot;
+    private BigDecimal totalPrice;
+
     private String status; // Ví dụ: "PENDING", "CONFIRMED", "CANCELLED"
 }

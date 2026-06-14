@@ -2,6 +2,8 @@ package org.example.it211_project_badmintonmanager.dto;
 
 import lombok.Getter;
 import lombok.Setter;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -10,4 +12,5 @@ public class BookingRequestDTO {
     private Long courtId;
     private LocalDate bookingDate;
     private String timeSlot;
+    private BigDecimal totalPrice;
 }
