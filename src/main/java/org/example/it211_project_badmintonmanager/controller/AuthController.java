@@ -119,7 +119,38 @@ public class AuthController {
             );
         }
     }
+    @PostMapping("/refresh-token")
+    public ResponseEntity<ResponseDTO<AuthResponseDTO>> refreshToken(@Valid @RequestBody TokenRefreshRequestDTO requestDTO) {
+        String requestRefreshToken = requestDTO.getRefreshToken();
 
+        try {
+            return refreshTokenService.findByToken(requestRefreshToken)
+                    .map(refreshTokenService::verifyExpiration)
+                    .map(RefreshToken::getUser)
+                    .map(user -> {
+                        // Tạo Access Token mới tinh
+                        String token = jwtUtil.generateToken(userDetailsService.loadUserByUsername(user.getUsername()));
+
+                        AuthResponseDTO responseDTO = AuthResponseDTO.builder()
+                                .accessToken(token)
+                                .refreshToken(requestRefreshToken) // Giữ nguyên Refresh Token cũ cho khách
+                                .build();
+
+                        return ResponseEntity.ok(
+                                ResponseDTO.<AuthResponseDTO>builder()
+                                        .success(true)
+                                        .message("Cấp lại Token thành công")
+                                        .data(responseDTO)
+                                        .build()
+                        );
+                    })
+                    .orElseThrow(() -> new RuntimeException("Refresh Token không tồn tại trong hệ thống hoặc đã hết hạn!"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    ResponseDTO.<AuthResponseDTO>builder().success(false).message(e.getMessage()).build()
+            );
+        }
+    }
     // 3. ĐĂNG XUẤT (FR-03 - Revoke Token)
     @PostMapping("/logout")
     public ResponseEntity<ResponseDTO<Void>> logout(HttpServletRequest request) { // 👉 THÊM HttpServletRequest VÀO ĐÂY
